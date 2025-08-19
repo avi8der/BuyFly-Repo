@@ -19,17 +19,14 @@ app.get('/api/dewey', (req: Request, res: Response) => {
 });
 
 app.post('/api/source', (req: Request, res: Response) => {
-  // Placeholder for source logic
   res.json({ status: 'Source endpoint' });
 });
 
 app.get('/api/snapstack', (req: Request, res: Response) => {
-  // Placeholder for snapstack logic
   res.json({ status: 'Snapstack endpoint' });
 });
 
-app.get('/api/nearby', (req: Request, res: Response) => {
-  // Placeholder for nearby sales logic
+app.get('/api/nearby', async (req: Request, res: Response) => {
   const { data, error } = await supabase
     .from('nearby_sales')
     .select('*')
@@ -63,28 +60,3 @@ cron.schedule('* * * * *', () => {
         const fetch = client.fetch(results, { bodies: '' });
         fetch.on('message', (msg: any, seqno: number) => {
           msg.on('body', (stream: any, info: any) => {
-            const parser = new mailparser.MailParser();
-            parser.on('end', (mail: any) => {
-              console.log('Email parsed:', mail.subject);
-            });
-            stream.pipe(parser);
-          });
-        });
-        fetch.once('error', (err: Error) => {
-          console.log('Fetch error:', err);
-        });
-        fetch.once('end', () => {
-          client.end();
-        });
-      });
-    });
-  });
-
-  client.on('error', (err: Error) => {
-    console.log('IMAP error:', err);
-  });
-
-  client.on('end', () => {
-    console.log('IMAP connection ended');
-  });
-});
