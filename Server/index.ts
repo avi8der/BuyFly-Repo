@@ -1,145 +1,90 @@
-import express from 'express';
-import { createClient } from '@supabase/supabase-js';
+import express, { Request, Response } from 'express';
 import cors from 'cors';
 import cron from 'node-cron';
-import { simpleParser } from 'mailparser';
-import Imap from 'imap';
-import { nanoid } from 'nanoid';
-require('dotenv').config();
+import mailparser from 'mailparser';
+import imap from 'imap';
+import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const app = express();
-app.use(express.json());
 app.use(cors());
+app.use(express.json());
 
-const supabase = createClient(process.env.DATABASE_URL!, { auth: { persistSession: false } });
-const imap = new Imap({
-  user: process.env.EMAIL_USER,
-  password: process.env.EMAIL_PASS,
-  host: 'imap.ionos.com',
-  port: 993,
-  tls: true,
+const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_KEY!);
+
+app.get('/api/dewey', (req: Request, res: Response) => {
+  res.json({ message: 'Dewey endpoint' });
 });
 
-// Seed data
-const seedData = async () => {
-  const { data: deweyData, error: deweyError } = await supabase.from('dewey').select('id');
-  if (deweyError || !deweyData.length) {
-    await supabase.from('dewey').insert([
-      { id: nanoid(), name: 'Deal 1', price: 10, recommendation: 'GOOD_DEAL' },
-      { id: nanoid(), name: 'Deal 2', price: 15, recommendation: 'GOOD_DEAL' },
-    ]);
-  }
-  const { data: nearbyData, error: nearbyError } = await supabase.from('nearby_sales').select('id');
-  if (nearbyError || !nearbyData.length) {
-    await supabase.from('nearby_sales').insert([
-      { id: nanoid(), name: 'Thrift Store', type: 'thrift', address: '123 Main St', latitude: 40.7128, longitude: -74.0060, distance: 5 },
-    ]);
-  }
-};
-seedData();
-
-// APIs
-app.get('/api/dewey', async (req, res) => {
-  const { data, error } = await supabase.from('dewey').select('*');
-  if (error) return res.status(500).json({ error: error.message });
-  res.json(data);
+app.post('/api/source', (req: Request, res: Response) => {
+  // Placeholder for source logic
+  res.json({ status: 'Source endpoint' });
 });
 
-app.post('/api/dewey/save', async (req, res) => {
-  const { id, ...item } = req.body;
-  const { data, error } = await supabase.from('dewey').upsert({ id: id || nanoid(), ...item }, { onConflict: 'id' });
-  if (error) return res.status(500).json({ error: error.message });
-  res.json(data);
+app.get('/api/snapstack', (req: Request, res: Response) => {
+  // Placeholder for snapstack logic
+  res.json({ status: 'Snapstack endpoint' });
 });
 
-app.get('/api/whos-near', async (req, res) => {
-  const { lat, lng, radius = 25 } = req.query;
-  const { data, error } = await supabase.from('nearby_sales').select('*').withinDistance('location', [Number(lng), Number(lat)], Number(radius) * 1609.34); // Convert miles to meters
-  if (error) return res.status(500).json({ error: error.message });
-  res.json(data);
+app.get('/api/nearby', (req: Request, res: Response) => {
+  // Placeholder for nearby sales logic
+  const { data, error } = await supabase
+    .from('nearby_sales')
+    .select('*')
+    .gte('distance', 0)
+    .lte('distance', 25);
+  if (error) res.status(500).json({ error: error.message });
+  else res.json(data);
 });
 
-app.post('/api/source', async (req, res) => {
-  const { image, barcode, purchasePrice, color, size, sku, quantity } = req.body;
-  // Mock analysis (replace with AI/ML service in production)
-  const analysis = {
-    id: nanoid(),
-    imageUrl: image,
-    identifiedProduct: barcode || 'Sample Product',
-    confidence: 0.95,
-    recommendation: 'GOOD_DEAL',
-    estimatedProfit: 20,
-    profitMargin: 0.5,
-    color,
-    size,
-    sku,
-    quantity: Number(quantity),
-    purchasePrice: Number(purchasePrice),
+app.listen(10000, () => console.log('Server on port 10000'));
+
+cron.schedule('* * * * *', () => {
+  console.log('Running cron job');
+  const imapConfig = {
+    user: process.env.EMAIL_USER!,
+    password: process.env.EMAIL_PASS!,
+    host: 'imap.gmail.com',
+    port: 993,
+    tls: true,
   };
-  const { data, error } = await supabase.from('dewey').insert(analysis);
-  if (error) return res.status(500).json({ error: error.message });
-  res.json(analysis);
-});
 
-app.get('/api/shipping', async (req, res) => {
-  const { data, error } = await supabase.from('shipping').select('*');
-  if (error) return res.status(500).json({ error: error.message });
-  res.json(data);
-});
+  const client = new imap(imapConfig);
 
-app.post('/api/shipping/mark-shipped', async (req, res) => {
-  const { id, platform } = req.body;
-  const { data, error } = await supabase.from('shipping').update({ status: 'shipped' }).eq('id', id);
-  if (error) return res.status(500).json({ error: error.message });
-  res.json(data);
-});
+  client.connect();
 
-app.post('/api/vendoo/prepare', async (req, res) => {
-  const { items } = req.body;
-  res.json({ success: true });
-});
-
-// Email parsing (unchanged)
-const checkEmails = () => {
-  imap.once('ready', () => {
-    imap.openBox('INBOX', true, (err) => {
+  client.on('ready', () => {
+    client.openBox('INBOX', true, (err: Error | null, box: any) => {
       if (err) throw err;
-      imap.search(['UNSEEN', ['SINCE', new Date(Date.now() - 24 * 60 * 60 * 1000)]], (err, results) => {
+      client.search(['UNSEEN'], (err: Error | null, results: any[]) => {
         if (err) throw err;
-        const fetch = imap.fetch(results, { bodies: '' });
-        fetch.on('message', (msg) => {
-          msg.on('body', (stream) => {
-            simpleParser(stream, async (err, mail) => {
-              if (err) throw err;
-              const subject = mail.subject?.toLowerCase();
-              if (subject?.includes('sold') || subject?.includes('purchase')) {
-                const platformMatch = subject.match(/(poshmark|mercari|depop)/i);
-                const itemMatch = subject.match(/(\w+\s+\w+)/i);
-                if (platformMatch && itemMatch) {
-                  const { data, error } = await supabase.from('shipping').insert({
-                    id: nanoid(),
-                    platform: platformMatch[0].toLowerCase(),
-                    itemName: itemMatch[0],
-                    salePrice: parseFloat(mail.text?.match(/\$\d+\.\d{2}/)?.[0].replace('$', '')) || 0,
-                    buyerAddress: mail.to?.text || 'N/A',
-                    shippingDeadline: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                  });
-                  if (!error) imap.addFlags(results, ['\\Seen'], () => {});
-                }
-              }
+        const fetch = client.fetch(results, { bodies: '' });
+        fetch.on('message', (msg: any, seqno: number) => {
+          msg.on('body', (stream: any, info: any) => {
+            const parser = new mailparser.MailParser();
+            parser.on('end', (mail: any) => {
+              console.log('Email parsed:', mail.subject);
             });
+            stream.pipe(parser);
           });
         });
-        fetch.once('end', () => imap.end());
+        fetch.once('error', (err: Error) => {
+          console.log('Fetch error:', err);
+        });
+        fetch.once('end', () => {
+          client.end();
+        });
       });
     });
   });
-  imap.once('error', (err) => console.error(err));
-  imap.once('end', () => console.log('IMAP connection ended'));
-};
 
-cron.schedule('*/15 * * * *', checkEmails);
-checkEmails();
+  client.on('error', (err: Error) => {
+    console.log('IMAP error:', err);
+  });
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+  client.on('end', () => {
+    console.log('IMAP connection ended');
+  });
+});
