@@ -36,7 +36,8 @@ import express, { Request, Response } from 'express';
        else res.json(data);
      });
 
-     app.listen(10000, () => console.log('Server on port 10000'));
+     const PORT = process.env.PORT || 10000;
+     app.listen(PORT, () => console.log(`Server on port ${PORT}`));
 
      cron.schedule('* * * * *', () => {
        console.log('Running cron job');
