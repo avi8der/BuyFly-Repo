@@ -1,2 +1,2 @@
 declare module 'mailparser';
-declare module 'imap';
+     declare module 'imap';
