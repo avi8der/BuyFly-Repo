@@ -1,0 +1,23 @@
+services:
+  # BuyFly Server (Express + TS)
+  - type: web
+    name: buyfly-server
+    env: node
+    rootDir: Server
+    buildCommand: npm run build
+    startCommand: npm start
+    envVars:
+      - key: NPM_CONFIG_PRODUCTION
+        value: false
+    plan: free
+
+  # BuyFly Client (React + TS)
+  - type: static_site
+    name: buyfly-client
+    rootDir: Client
+    buildCommand: npm run build
+    staticPublishPath: build
+    envVars:
+      - key: NPM_CONFIG_PRODUCTION
+        value: false
+    plan: free
