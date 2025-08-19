@@ -1,3 +1,6 @@
+// Server/index.ts
+// BuyFly Server — no email/IMAP code. All required routes, safe defaults.
+
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import multer from 'multer';
