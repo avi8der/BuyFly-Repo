@@ -19,11 +19,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Use Node 18
+      - name: Use Node 18 (cache per app)
         uses: actions/setup-node@v4
         with:
           node-version: '18'
           cache: 'npm'
+          cache-dependency-path: |
+            Client/package-lock.json
+            Server/package-lock.json
 
       # ---------- Client ----------
       - name: Install Client deps
@@ -63,13 +66,8 @@ jobs:
           HOOK: ${{ secrets.RENDER_SERVER_HOOK_URL }}
         run: curl -fsS -X POST "$HOOK"
 
-      # optional: wait a bit so latest server build starts before client deploy
       - name: Pause briefly
         run: sleep 10
-
-      # simple health check (doesn't fail build if it returns non-200)
-      - name: Health check (non-blocking)
-        run: echo "Skipping live health check (render builds asynchronously)."
 
       - name: Trigger Render Client Deploy
         env:
