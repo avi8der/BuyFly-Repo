@@ -2,14 +2,19 @@
 import { useState } from 'react';
 
 export default function App() {
-  const [count, setCount] = useState(0);
+  const [clicked, setClicked] = useState(false);
+
   return (
-    <div style={{ fontFamily: 'system-ui', padding: 16 }}>
+    <div style={{ fontFamily: 'system-ui', padding: 20 }}>
       <h1>BuyFly 🦉</h1>
-      <p>Build check — Client is compiling without Radix UI.</p>
-      <button onClick={() => setCount((c) => c + 1)} style={{ padding: '8px 12px', borderRadius: 8 }}>
-        Clicks: {count}
+      <p>CI test build — no Radix imports here.</p>
+      <button
+        onClick={() => setClicked(true)}
+        style={{ padding: '10px 16px', borderRadius: 8, cursor: 'pointer' }}
+      >
+        Test Button
       </button>
+      {clicked && <p>✅ Button works!</p>}
     </div>
   );
 }
