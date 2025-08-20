@@ -1,0 +1,24 @@
+/* Client/src/index.css */
+
+/* Basic resets */
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+
+/* Simple mobile-friendly tweaks */
+.mobile-optimized { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+.touch-friendly { min-height: 44px; }
+
+/* Pretty header text */
+.gradient-text {
+  background: linear-gradient(90deg, #60a5fa, #a78bfa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Camera area */
+.camera-container { position: relative; }
+.camera-video { width: 100%; height: 60vh; object-fit: cover; border-radius: 12px; }
+.capture-button { border: none; cursor: pointer; }
+
+/* Sticky bars blur (optional) */
+.sticky { backdrop-filter: blur(6px); }
