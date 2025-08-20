@@ -1,9 +1,15 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -e
 
-echo "Installing deps…"
-npm install
+echo "Node: $(node -v)"
+echo "NPM:  $(npm -v)"
 
-echo "Building React (CRA) with Node…"
-# CI=false avoids “treating warnings as errors” in CI
-CI=false node node_modules/react-scripts/scripts/build.js
+# Ensure deps are present (works for both fresh and cached builds)
+if [ -f package-lock.json ]; then
+  npm ci || npm install
+else
+  npm install
+fi
+
+# 🔧 Run CRA build by invoking the JS directly (avoids exec permission issues)
+node ./node_modules/react-scripts/bin/react-scripts.js build
