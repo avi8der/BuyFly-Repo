@@ -1,0 +1,63 @@
+name: BuyFly CI + Render Deploy
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      # ---------- Client ----------
+      - name: Install Client deps
+        working-directory: Client
+        run: |
+          npm ci || npm install
+
+      - name: Build Client (CRA via script)
+        working-directory: Client
+        run: |
+          bash build.sh
+
+      - name: Upload Client build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: client-build
+          path: Client/build
+
+      # ---------- Server ----------
+      - name: Install Server deps
+        working-directory: Server
+        run: |
+          npm ci || npm install
+
+      - name: Build Server (tsc)
+        working-directory: Server
+        run: |
+          npm run build
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render Client Deploy
+        env:
+          HOOK: ${{ secrets.RENDER_CLIENT_HOOK_URL }}
+        run: |
+          curl -fsS -X POST "$HOOK"
+
+      - name: Trigger Render Server Deploy
+        env:
+          HOOK: ${{ secrets.RENDER_SERVER_HOOK_URL }}
+        run: |
+          curl -fsS -X POST "$HOOK"
