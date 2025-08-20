@@ -85,9 +85,7 @@ interface ShippingItem {
 const Btn = (props: React.ButtonHTMLAttributes<HTMLButtonElement>) => (
   <button
     {...props}
-    className={`touch-friendly rounded px-3 py-2 transition-transform hover:scale-95 ${
-      props.className || ''
-    }`}
+    className={`touch-friendly rounded px-3 py-2 transition-transform hover:scale-95 ${props.className || ''}`}
     type={props.type || 'button'}
   />
 );
@@ -97,7 +95,6 @@ const App = () => {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [mode, setMode] = useState<'whosnear' | 'source' | 'snapstack' | 'dewey' | 'shipping' | 'settings'>('whosnear');
   const [searchQuery, setSearchQuery] = useState('');
-  const [image, setImage] = useState<string | null>(null);
   const [images, setImages] = useState<string[]>([]);
   const [barcode, setBarcode] = useState<string | null>(null);
   const [purchasePrice, setPurchasePrice] = useState<string>('0');
@@ -113,9 +110,7 @@ const App = () => {
   const [size, setSize] = useState<string>('');
   const [sku, setSku] = useState<string>('');
   const [quantity, setQuantity] = useState<number>(1);
-  const [approveImages, setApproveImages] = useState(false);
 
-  const speechRecognition = useRef<SpeechRecognition | null>(null);
   const codeReader = useRef(new BrowserMultiFormatReader());
 
   // Load settings
@@ -168,7 +163,7 @@ const App = () => {
     },
   });
 
-  // Mutation for Source analysis
+  // Analyze (Source)
   const analyzeMutation = useMutation({
     mutationFn: (data: FormData) =>
       axios
@@ -176,7 +171,6 @@ const App = () => {
         .then((res) => res.data),
     onSuccess: (data) => {
       toast({ title: data.recommendation, description: `${data.identifiedProduct} - Profit: $${data.estimatedProfit.toFixed(2)}` });
-      setImage(null);
       setBarcode(null);
       if (data.recommendation === 'GOOD_DEAL') {
         const promptVal = window.prompt('Enter purchase price:');
@@ -189,7 +183,7 @@ const App = () => {
     onError: () => toast({ title: 'Error', description: 'Failed to analyze product. Try again?' }),
   });
 
-  // Mutation for SnapStack
+  // SnapStack
   const queueToSnapStack = useMutation({
     mutationFn: (analysis: ProductAnalysis) => db.snapStack.put({ ...analysis, photos: [analysis.imageUrl] }),
     onSuccess: () => {
@@ -198,16 +192,16 @@ const App = () => {
     },
   });
 
-  // Mutation for Dewey
+  // Dewey
   const saveToDewey = useMutation({
     mutationFn: (item: ProductAnalysis) => axios.post('/api/dewey/save', item).then((res) => res.data),
     onSuccess: () => {
       refetchDewey();
-      toast({ title: 'Saved to Dewey', description: 'Item ready for Vendoo. Open the bot to continue.' });
+      toast({ title: 'Saved to Dewey', description: 'Item ready for Vendoo. Open the bot.' });
     },
   });
 
-  // Mutation for marking shipped
+  // Mark shipped
   const markShipped = useMutation({
     mutationFn: ({ id, platform }: { id: string; platform: string }) =>
       axios.post('/api/shipping/mark-shipped', { id, platform, apiKey: ebayApiKey }).then((res) => res.data),
@@ -221,12 +215,12 @@ const App = () => {
         setLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
         refetchNearby();
       },
-      () => toast({ title: 'Location Error', description: 'Unable to get location. Using cached data.' }),
+      () => toast({ title: 'Location Error', description: 'Using cached data.' }),
       { enableHighAccuracy: true }
     );
   }, []);
 
-  // Initialize camera (mobile only)
+  // Camera (mobile only)
   useEffect(() => {
     const startCamera = async () => {
       if (!isMobile) {
@@ -234,27 +228,23 @@ const App = () => {
         return;
       }
       try {
-        const mediaStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment' },
-        });
+        const mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
         if (videoRef.current) {
           (videoRef.current as any).srcObject = mediaStream;
           setStream(mediaStream);
         }
-      } catch (error) {
+      } catch {
         toast({ title: 'Camera Error', description: 'Unable to access camera' });
       }
     };
 
-    if (mode === 'source' || mode === 'snapstack') {
-      startCamera();
-    }
+    if (mode === 'source' || mode === 'snapstack') startCamera();
 
     db.snapStack.toArray().then(setSnapStackQueue);
     db.history.toArray().then(setHistory);
 
     return () => {
-      if (stream) stream.getTracks().forEach((track) => track.stop());
+      if (stream) stream.getTracks().forEach((t) => t.stop());
     };
   }, [mode]);
 
@@ -266,58 +256,53 @@ const App = () => {
           setBarcode(result.getText());
           toast({ title: 'Barcode Detected', description: result.getText() });
         }
-        if (error && !error.isNoResult?.()) {
+        if (error && !(error as any).isNoResult?.()) {
           console.error('Barcode error:', error);
           toast({ title: 'Barcode Error', description: 'Retry or use Google Lens?' });
         }
       });
     }
-
-    return () => {
-      codeReader.current.reset();
-    };
+    return () => codeReader.current.reset();
   }, [mode]);
 
   // Voice search
   useEffect(() => {
-    if (voiceSearch) {
-      const RecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!RecognitionCtor) {
-        toast({ title: 'Voice Search', description: 'Not supported in this browser' });
-        setVoiceSearch(false);
-        return;
-      }
-      const recognition = new RecognitionCtor();
-      (recognition as any).onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
-        setSearchQuery(transcript);
-        toast({ title: 'Voice Search', description: transcript });
-        setVoiceSearch(false);
-      };
-      (recognition as any).onend = () => setVoiceSearch(false);
-      (recognition as any).start();
+    if (!voiceSearch) return;
+    const RecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!RecognitionCtor) {
+      toast({ title: 'Voice Search', description: 'Not supported in this browser' });
+      setVoiceSearch(false);
+      return;
     }
+    const recognition = new RecognitionCtor();
+    (recognition as any).onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setSearchQuery(transcript);
+      toast({ title: 'Voice Search', description: transcript });
+      setVoiceSearch(false);
+    };
+    (recognition as any).onend = () => setVoiceSearch(false);
+    (recognition as any).start();
   }, [voiceSearch]);
 
   // Capture image
   const captureImage = async () => {
     if (!videoRef.current || !stream || !isMobile) return;
-
     const canvas = document.createElement('canvas');
     canvas.width = videoRef.current.videoWidth;
     canvas.height = videoRef.current.videoHeight;
     canvas.getContext('2d')?.drawImage(videoRef.current, 0, 0);
     let imageUrl = canvas.toDataURL('image/jpeg', 0.7);
-
     imageUrl = await autoProcessImage(imageUrl);
 
     if (mode === 'source') {
-      images.push(imageUrl);
+      const next = [...images, imageUrl];
+      setImages(next);
       const maxPhotos = barcode ? 1 : (batchMode ? 10 : 3);
-      if (images.length < maxPhotos) return;
+      if (next.length < maxPhotos) return;
       if (window.confirm('Approve images?')) {
         const formData = new FormData();
-        images.forEach((img, i) => formData.append(`image${i}`, img));
+        next.forEach((img, i) => formData.append(`image${i}`, img));
         if (barcode) formData.append('barcode', barcode);
         formData.append('purchasePrice', purchasePrice || '0');
         formData.append('color', color);
@@ -332,11 +317,10 @@ const App = () => {
       if (updatedPhotos.length <= 25) {
         const updatedItem = { ...currentSnapStackItem, photos: updatedPhotos };
         await db.snapStack.put(updatedItem);
-        setSnapStackQueue((prev) => prev.map((item) => (item.id === updatedItem.id ? updatedItem : item)));
-        toast({ title: 'Photo Added', description: `Added to ${updatedItem.identifiedProduct} (${updatedPhotos.length}/25)` });
-        setCurrentSnapStackItem(
-          snapStackQueue[snapStackQueue.findIndex((item) => item.id === currentSnapStackItem.id) + 1] || null
-        );
+        setSnapStackQueue((prev) => prev.map((it) => (it.id === updatedItem.id ? updatedItem : it)));
+        toast({ title: 'Photo Added', description: `Added (${updatedPhotos.length}/25)` });
+        const idx = snapStackQueue.findIndex((it) => it.id === currentSnapStackItem.id);
+        setCurrentSnapStackItem(snapStackQueue[idx + 1] || null);
       } else {
         toast({ title: 'Limit', description: 'Max 25 photos' });
       }
@@ -407,40 +391,11 @@ const App = () => {
     }
   };
 
-  // Send all to Dewey
-  const sendAllToDewey = async () => {
-    for (const item of snapStackQueue) {
-      await saveToDewey.mutate(item);
-      await db.snapStack.delete(item.id);
-    }
-    setSnapStackQueue([]);
-    setCurrentSnapStackItem(null);
-    setMode('dewey');
-    toast({ title: 'Complete', description: 'All sent to Dewey. Open bot.' });
-  };
-
-  // Trigger Vendoo bot
-  const triggerVendooBot = async () => {
-    try {
-      await axios.post('/api/vendoo/prepare', { items: deweyItems });
-      toast({ title: 'Vendoo Prep', description: 'Items sent to bot' });
-    } catch {
-      toast({ title: 'Vendoo Error', description: 'Failed to prepare' });
-    }
-  };
-
   // Pull-to-refresh
   const handleRefresh = () => {
     if (mode === 'whosnear') refetchNearby();
     if (mode === 'dewey') refetchDewey();
     if (mode === 'shipping') refetchShipping();
-  };
-
-  // Clear history
-  const clearHistory = () => {
-    setHistory([]);
-    db.history.clear();
-    toast({ title: 'Cleared', description: 'History reset' });
   };
 
   return (
@@ -617,7 +572,7 @@ const App = () => {
                     <ShoppingCart className="w-5 h-5" /> Buy
                   </Btn>
                 )}
-                <Btn onClick={() => setImage(null)} className="bg-gray-600 text-white rounded flex items-center gap-2">
+                <Btn onClick={() => { /* mark fly in history */ }} className="bg-gray-600 text-white rounded flex items-center gap-2">
                   Fly
                 </Btn>
               </div>
@@ -646,7 +601,16 @@ const App = () => {
                 >
                   Start New
                 </Btn>
-                <Btn onClick={sendAllToDewey} className="bg-purple-600 text-white rounded flex items-center gap-2">
+                <Btn onClick={async () => {
+                  for (const item of snapStackQueue) {
+                    await saveToDewey.mutate(item);
+                    await db.snapStack.delete(item.id);
+                  }
+                  setSnapStackQueue([]);
+                  setCurrentSnapStackItem(null);
+                  setMode('dewey');
+                  toast({ title: 'Complete', description: 'All sent to Dewey. Open bot.' });
+                }} className="bg-purple-600 text-white rounded flex items-center gap-2">
                   <CheckCircle className="w-5 h-5" /> Send All
                 </Btn>
               </div>
@@ -715,7 +679,14 @@ const App = () => {
             <div className="animate-pulse space-y-2">{[1, 2, 3].map((i) => <div key={i} className="h-16 bg-gray-700 rounded" />)}</div>
           )}
           {!!deweyItems?.length && (
-            <Btn onClick={triggerVendooBot} className="bg-blue-600 text-white rounded flex items-center gap-2 mt-4">
+            <Btn onClick={async () => {
+              try {
+                await axios.post('/api/vendoo/prepare', { items: deweyItems });
+                toast({ title: 'Vendoo Prep', description: 'Items sent to bot' });
+              } catch {
+                toast({ title: 'Vendoo Error', description: 'Failed to prepare' });
+              }
+            }} className="bg-blue-600 text-white rounded flex items-center gap-2 mt-4">
               <CheckCircle className="w-5 h-5" /> Send to Bot
             </Btn>
           )}
