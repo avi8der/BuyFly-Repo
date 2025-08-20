@@ -19,19 +19,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Use Node 18 (cache per app)
+      - name: Use Node 18
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: |
-            Client/package-lock.json
-            Server/package-lock.json
+          node-version: '18'   # no caching; avoids lockfile requirement
 
       # ---------- Client ----------
       - name: Install Client deps
         working-directory: Client
-        run: npm ci || npm install
+        run: npm install
 
       - name: Build Client (CRA via script)
         working-directory: Client
@@ -46,7 +42,7 @@ jobs:
       # ---------- Server ----------
       - name: Install Server deps
         working-directory: Server
-        run: npm ci || npm install
+        run: npm install
 
       - name: Build Server (tsc)
         working-directory: Server
@@ -58,8 +54,8 @@ jobs:
     steps:
       - name: Fail if hooks missing (early)
         run: |
-          test -n "${{ secrets.RENDER_CLIENT_HOOK_URL }}" || { echo "Missing RENDER_CLIENT_HOOK_URL secret"; exit 1; }
-          test -n "${{ secrets.RENDER_SERVER_HOOK_URL }}" || { echo "Missing RENDER_SERVER_HOOK_URL secret"; exit 1; }
+          test -n "${{ secrets.RENDER_CLIENT_HOOK_URL }}" || { echo "Missing RENDER_CLIENT_HOOK_URL"; exit 1; }
+          test -n "${{ secrets.RENDER_SERVER_HOOK_URL }}" || { echo "Missing RENDER_SERVER_HOOK_URL"; exit 1; }
 
       - name: Trigger Render Server Deploy
         env:
