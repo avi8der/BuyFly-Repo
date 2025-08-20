@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { BrowserMultiFormatReader } from '@zxing/library';
@@ -7,24 +7,25 @@ import { isMobile } from 'react-device-detect';
 import { Virtuoso } from 'react-virtuoso';
 import './index.css';
 
-// ==== Local Button + toast (no external libs) ====
-type BtnProps = ButtonHTMLAttributes<HTMLButtonElement> & { className?: string; children?: ReactNode };
-const Button = ({ className = '', children, ...rest }: BtnProps) => (
+/** ===== Local Button + toast (no external libs) ===== */
+type BtnProps = React.ButtonHTMLAttributes<HTMLButtonElement> & { className?: string; children?: React.ReactNode };
+const Button: React.FC<BtnProps> = ({ className = '', children, ...rest }) => (
   <button {...rest} className={`px-3 py-2 rounded ${className}`}>{children}</button>
 );
 
 const toast = ({ title, description }: { title: string; description?: string }) => {
   if (description) alert(`${title}\n${description}`); else alert(title);
-  try { console.log(`[toast] ${title}${description ? " - " + description : ""}`); } catch {}
+  try { console.log(`[toast] ${title}${description ? ' - ' + description : ''}`); } catch {}
 };
 
-// ==== Axios base URL from Render (VITE_API_HOST -> https://host) ====
-const __host = import.meta.env.VITE_API_HOST as string | undefined;
+/** ===== Axios base URL from Render (VITE_API_HOST -> https://host) ===== */
+const __host = (import.meta as any).env?.VITE_API_HOST as string | undefined;
 const API_URL = __host ? `https://${__host}` : '';
 axios.defaults.baseURL = API_URL;
 
 const codeReader = new BrowserMultiFormatReader();
 
+/** ===== Types ===== */
 interface ProductAnalysis {
   id: string;
   imageUrl: string;
@@ -69,7 +70,7 @@ interface ShippingItem {
   shippingDeadline: string;
 }
 
-const App = () => {
+const App: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [mode, setMode] = useState<'whosnear' | 'source' | 'snapstack' | 'dewey' | 'shipping' | 'settings'>('whosnear');
@@ -92,17 +93,15 @@ const App = () => {
   const [quantity, setQuantity] = useState<number>(1);
   const [approveImages, setApproveImages] = useState(false);
 
-  const speechRecognition = useRef<SpeechRecognition | null>(null);
-
   // Load settings
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') || 'dark';
-    setTheme(savedTheme as 'dark' | 'light');
+    setTheme(savedTheme === 'light' ? 'light' : 'dark');
     const savedEbayApiKey = localStorage.getItem('ebayApiKey') || '';
     setEbayApiKey(savedEbayApiKey);
   }, []);
 
-  // Query for Dewey items
+  // Query: Dewey
   const { data: deweyItems, refetch: refetchDewey } = useQuery<ProductAnalysis[]>({
     queryKey: ['dewey', searchQuery],
     queryFn: async () => {
@@ -111,7 +110,7 @@ const App = () => {
     },
   });
 
-  // Query for Who's Near
+  // Query: Who's Near
   const { data: nearbySales, refetch: refetchNearby } = useQuery<NearbySale[]>({
     queryKey: ['whosnear', location, searchQuery],
     queryFn: async () => {
@@ -121,7 +120,7 @@ const App = () => {
     enabled: !!location,
   });
 
-  // Query for Shipping items
+  // Query: Shipping
   const { data: shippingItems, refetch: refetchShipping } = useQuery<ShippingItem[]>({
     queryKey: ['shipping', searchQuery],
     queryFn: async () => {
@@ -130,10 +129,9 @@ const App = () => {
     },
   });
 
-  // Mutation for Source analysis
+  // Mutation: analyze Source
   const analyzeMutation = useMutation({
-    mutationFn: (data: FormData) =>
-      axios.post<ProductAnalysis>('/api/source', data, { headers: { 'X-eBay-Api-Key': ebayApiKey } }),
+    mutationFn: (form: FormData) => axios.post<ProductAnalysis>('/api/source', form, { headers: { 'X-eBay-Api-Key': ebayApiKey } }),
     onSuccess: (data) => {
       toast({ title: data.recommendation, description: `${data.identifiedProduct} - Profit: $${data.estimatedProfit.toFixed(2)}` });
       setImage(null);
@@ -149,7 +147,7 @@ const App = () => {
     onError: () => toast({ title: 'Error', description: 'Failed to analyze product. Try again?' }),
   });
 
-  // Mutation for SnapStack
+  // Mutation: SnapStack queue
   const queueToSnapStack = useMutation({
     mutationFn: (analysis: ProductAnalysis) => axios.post('/api/dewey/save', analysis),
     onSuccess: () => {
@@ -158,7 +156,7 @@ const App = () => {
     },
   });
 
-  // Mutation for Dewey
+  // Mutation: Dewey save
   const saveToDewey = useMutation({
     mutationFn: (item: ProductAnalysis) => axios.post('/api/dewey/save', item),
     onSuccess: () => {
@@ -167,7 +165,7 @@ const App = () => {
     },
   });
 
-  // Mutation for marking shipped
+  // Mutation: mark shipped
   const markShipped = useMutation({
     mutationFn: ({ id, platform }: { id: string; platform: string }) =>
       axios.post('/api/shipping/mark-shipped', { id, platform, apiKey: ebayApiKey }),
@@ -179,14 +177,14 @@ const App = () => {
     navigator.geolocation.getCurrentPosition(
       (position) => {
         setLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
-        refetchNearby();
+        try { refetchNearby(); } catch {}
       },
       () => toast({ title: 'Location Error', description: 'Unable to get location. Using cached data.' }),
       { enableHighAccuracy: true }
     );
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Initialize camera (mobile only)
+  // Camera (mobile only)
   useEffect(() => {
     const startCamera = async () => {
       if (!isMobile) {
@@ -194,23 +192,21 @@ const App = () => {
         return;
       }
       try {
-        const mediaStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment' },
-        });
+        const mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
         if (videoRef.current) {
           (videoRef.current as any).srcObject = mediaStream;
           setStream(mediaStream);
         }
-      } catch {
+      } catch (e) {
         toast({ title: 'Camera Error', description: 'Unable to access camera' });
       }
     };
-
     if (mode === 'source' || mode === 'snapstack') startCamera();
-    return () => { if (stream) stream.getTracks().forEach(t => t.stop()); };
+    return () => { if (stream) stream.getTracks().forEach((t) => t.stop()); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
-  // Barcode scanning
+  // Barcode scanning (avoid optional-call syntax)
   useEffect(() => {
     if (videoRef.current && mode === 'source' && isMobile) {
       codeReader.decodeFromVideoDevice(undefined, videoRef.current, (result, error) => {
@@ -218,20 +214,24 @@ const App = () => {
           setBarcode(result.getText());
           toast({ title: 'Barcode Detected', description: result.getText() });
         }
-        if (error && !(error as any).isNoResult?.()) {
+        const errAny: any = error;
+        const isNoResultFn = errAny && errAny.isNoResult;
+        const isRealError = error && !(typeof isNoResultFn === 'function' && isNoResultFn.call(errAny));
+        if (isRealError) {
           console.error('Barcode error:', error);
           toast({ title: 'Barcode Error', description: 'Retry? Or use Google Lens.' });
         }
       });
     }
     return () => { codeReader.reset(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
-  // Voice search
+  // Voice search (no import type)
   useEffect(() => {
     if (voiceSearch) {
-      const Ctor = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      const recognition = Ctor ? new Ctor() : null;
+      const Ctor: any = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      const recognition: any = Ctor ? new Ctor() : null;
       if (recognition) {
         recognition.onresult = (event: any) => {
           const transcript = event.results[0][0].transcript;
@@ -256,7 +256,6 @@ const App = () => {
     canvas.height = videoRef.current.videoHeight;
     canvas.getContext('2d')?.drawImage(videoRef.current, 0, 0);
     let imageUrl = canvas.toDataURL('image/jpeg', 0.7);
-
     imageUrl = await autoProcessImage(imageUrl);
 
     if (mode === 'source') {
@@ -272,7 +271,7 @@ const App = () => {
         formData.append('color', color);
         formData.append('size', size);
         formData.append('sku', sku);
-        formData.append('quantity', quantity.toString());
+        formData.append('quantity', String(quantity));
         analyzeMutation.mutate(formData);
       }
       setImages([]);
@@ -286,17 +285,16 @@ const App = () => {
       } else {
         toast({ title: 'Limit Reached', description: 'Max 25 photos allowed' });
       }
-      setCurrentSnapStackItem(
-        snapStackQueue[snapStackQueue.findIndex(item => item.id === currentSnapStackItem.id) + 1] || null
-      );
+      const idx = snapStackQueue.findIndex((it) => it.id === currentSnapStackItem.id);
+      setCurrentSnapStackItem(snapStackQueue[idx + 1] || null);
     }
   };
 
-  // Auto process image
+  // Auto process image (no fancy TS)
   const autoProcessImage = async (imageUrl: string) => {
     const img = new Image();
     img.src = imageUrl;
-    await new Promise((resolve) => { (img.onload as any) = resolve; });
+    await new Promise<void>((resolve) => { (img.onload as any) = () => resolve(); });
     const rotated = document.createElement('canvas');
     const rctx = rotated.getContext('2d')!;
     rotated.width = img.height;
@@ -333,27 +331,31 @@ const App = () => {
     }
   };
 
-  // Handle Next Item
+  // Next item
   const handleNextItem = async () => {
     if (currentSnapStackItem) {
-      await saveToDewey.mutate(currentSnapStackItem);
-      setCurrentSnapStackItem(snapStackQueue[snapStackQueue.findIndex(item => item.id === currentSnapStackItem.id) + 1] || null);
-      if (!snapStackQueue[snapStackQueue.findIndex(item => item.id === currentSnapStackItem.id) + 1]) {
+      await (saveToDewey as any).mutate(currentSnapStackItem);
+      const idx = snapStackQueue.findIndex((it) => it.id === currentSnapStackItem.id);
+      const next = snapStackQueue[idx + 1] || null;
+      setCurrentSnapStackItem(next);
+      if (!next) {
         toast({ title: 'Complete', description: 'All items sent to Dewey. Open the bot to continue.' });
       }
     }
   };
 
-  // Send all to Dewey
+  // Send all
   const sendAllToDewey = async () => {
-    for (const item of snapStackQueue) await saveToDewey.mutate(item as any);
+    for (const item of snapStackQueue) {
+      await (saveToDewey as any).mutate(item);
+    }
     setSnapStackQueue([]);
     setCurrentSnapStackItem(null);
     setMode('dewey');
     toast({ title: 'Complete', description: 'All items sent to Dewey. Open the bot to continue.' });
   };
 
-  // Trigger Vendoo bot
+  // Vendoo
   const triggerVendooBot = async () => {
     try {
       await axios.post('/api/vendoo/prepare', { items: deweyItems });
@@ -388,10 +390,7 @@ const App = () => {
             placeholder="Search..."
             className={`touch-friendly border rounded p-2 flex-1 ${theme === 'dark' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-900'}`}
           />
-          <Button
-            onClick={() => setVoiceSearch(true)}
-            className="bg-blue-600 text-white rounded p-2 transition-transform hover:scale-95"
-          >
+          <Button onClick={() => setVoiceSearch(true)} className="bg-blue-600 text-white rounded p-2 transition-transform hover:scale-95">
             <Mic className="w-5 h-5" />
           </Button>
         </div>
@@ -424,10 +423,7 @@ const App = () => {
           <h2 className="text-xl font-semibold">Who's Near 🦉</h2>
           {nearbySales ? (
             <div>
-              <select
-                onChange={() => refetchNearby()}
-                className={`touch-friendly border rounded p-2 mb-4 ${theme === 'dark' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-900'}`}
-              >
+              <select onChange={() => refetchNearby()} className={`touch-friendly border rounded p-2 mb-4 ${theme === 'dark' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-900'}`}>
                 <option value="">All Sales</option>
                 <option value="thrift">Thrift Stores</option>
                 <option value="estate">Estate Sales</option>
@@ -440,11 +436,7 @@ const App = () => {
                   <div className={`border p-2 rounded mb-2 ${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-100'}`}>
                     <p className="font-semibold">{sale.name} ({sale.type})</p>
                     <p>
-                      <a
-                        href={`waze://?ll=${sale.latitude},${sale.longitude}&navigate=yes`}
-                        target="_blank"
-                        className="text-blue-400 underline flex items-center gap-1"
-                      >
+                      <a href={`waze://?ll=${sale.latitude},${sale.longitude}&navigate=yes`} target="_blank" rel="noreferrer" className="text-blue-400 underline flex items-center gap-1">
                         <MapPin className="w-4 h-4" /> {sale.address}
                       </a>
                     </p>
@@ -473,10 +465,7 @@ const App = () => {
               <p className="text-center">Camera is mobile-only</p>
             )}
             {isMobile && (
-              <button
-                onClick={captureImage}
-                className="capture-button absolute bottom-4 right-4 bg-gradient-to-r from-blue-500 to-purple-600 p-4 rounded-full shadow-lg transition-transform hover:scale-95"
-              >
+              <button onClick={captureImage} className="capture-button absolute bottom-4 right-4 bg-gradient-to-r from-blue-500 to-purple-600 p-4 rounded-full shadow-lg transition-transform hover:scale-95">
                 <Camera className="w-8 h-8 text-white" />
               </button>
             )}
@@ -531,16 +520,10 @@ const App = () => {
               />
             </div>
             <div className="flex gap-2">
-              <Button
-                onClick={() => setBatchMode(!batchMode)}
-                className={`touch-friendly bg-blue-600 text-white rounded p-2 transition-transform hover:scale-95 ${batchMode ? 'bg-green-600' : ''}`}
-              >
+              <Button onClick={() => setBatchMode(!batchMode)} className={`touch-friendly bg-blue-600 text-white rounded p-2 transition-transform hover:scale-95 ${batchMode ? 'bg-green-600' : ''}`}>
                 {batchMode ? 'Batch Mode' : 'Single Mode'}
               </Button>
-              <Button
-                onClick={() => analyzeMutation.mutate(new FormData())}
-                className="touch-friendly bg-purple-600 text-white rounded p-2 transition-transform hover:scale-95"
-              >
+              <Button onClick={() => analyzeMutation.mutate(new FormData())} className="touch-friendly bg-purple-600 text-white rounded p-2 transition-transform hover:scale-95">
                 Get Results
               </Button>
             </div>
@@ -552,17 +535,11 @@ const App = () => {
               <p className="text-sm">{analyzeMutation.data.recommendation}</p>
               <div className="flex gap-2 mt-2">
                 {analyzeMutation.data.recommendation === 'GOOD_DEAL' && (
-                  <Button
-                    onClick={() => handleBuy(analyzeMutation.data)}
-                    className="bg-green-600 text-white rounded flex items-center gap-2 transition-transform hover:scale-95"
-                  >
+                  <Button onClick={() => handleBuy(analyzeMutation.data)} className="bg-green-600 text-white rounded flex items-center gap-2 transition-transform hover:scale-95">
                     <ShoppingCart className="w-5 h-5" /> Buy
                   </Button>
                 )}
-                <Button
-                  onClick={() => setImage(null)}
-                  className="bg-gray-600 text-white rounded flex items-center gap-2 transition-transform hover:scale-95"
-                >
+                <Button onClick={() => setImage(null)} className="bg-gray-600 text-white rounded flex items-center gap-2 transition-transform hover:scale-95">
                   Fly
                 </Button>
               </div>
@@ -579,10 +556,7 @@ const App = () => {
               <h2 className="text-xl font-semibold">SnapStack Queue</h2>
               <p>Proceed with saved items or start new?</p>
               <div className="flex gap-2 mt-2">
-                <Button
-                  onClick={() => setCurrentSnapStackItem(snapStackQueue[0])}
-                  className="bg-blue-600 text-white rounded transition-transform hover:scale-95"
-                >
+                <Button onClick={() => setCurrentSnapStackItem(snapStackQueue[0])} className="bg-blue-600 text-white rounded transition-transform hover:scale-95">
                   Proceed with Saved
                 </Button>
                 <Button
@@ -595,10 +569,7 @@ const App = () => {
                 >
                   <Trash2 className="w-5 h-5" /> Clear
                 </Button>
-                <Button
-                  onClick={sendAllToDewey}
-                  className="bg-purple-600 text-white rounded flex items-center gap-2 transition-transform hover:scale-95"
-                >
+                <Button onClick={sendAllToDewey} className="bg-purple-600 text-white rounded flex items-center gap-2 transition-transform hover:scale-95">
                   <CheckCircle className="w-5 h-5" /> Send All to Dewey
                 </Button>
               </div>
@@ -606,10 +577,7 @@ const App = () => {
                 style={{ height: '50vh' }}
                 data={snapStackQueue}
                 itemContent={(index, item) => (
-                  <div
-                    className={`border p-2 rounded mb-2 cursor-pointer ${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-100'}`}
-                    onClick={() => setCurrentSnapStackItem(item)}
-                  >
+                  <div className={`border p-2 rounded mb-2 cursor-pointer ${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-100'}`} onClick={() => setCurrentSnapStackItem(item)}>
                     <p>{item.identifiedProduct} - ${item.estimatedProfit.toFixed(2)}</p>
                   </div>
                 )}
@@ -621,10 +589,7 @@ const App = () => {
               {isMobile ? (
                 <div className="camera-container relative">
                   <video ref={videoRef} autoPlay playsInline className="camera-video w-full h-[60vh] rounded-lg" />
-                  <button
-                    onClick={captureImage}
-                    className="capture-button absolute bottom-4 right-4 bg-gradient-to-r from-blue-500 to-purple-600 p-4 rounded-full shadow-lg transition-transform hover:scale-95"
-                  >
+                  <button onClick={captureImage} className="capture-button absolute bottom-4 right-4 bg-gradient-to-r from-blue-500 to-purple-600 p-4 rounded-full shadow-lg transition-transform hover:scale-95">
                     <Camera className="w-8 h-8 text-white" />
                   </button>
                 </div>
@@ -633,10 +598,7 @@ const App = () => {
               )}
               <div className="mt-4">
                 <p>Photos: {currentSnapStackItem.photos?.length || 0}/25</p>
-                <Button
-                  onClick={handleNextItem}
-                  className="bg-blue-600 text-white rounded flex items-center gap-2 mt-2 transition-transform hover:scale-95"
-                >
+                <Button onClick={handleNextItem} className="bg-blue-600 text-white rounded flex items-center gap-2 mt-2 transition-transform hover:scale-95">
                   Next Item
                 </Button>
               </div>
@@ -669,10 +631,7 @@ const App = () => {
             </div>
           )}
           {deweyItems?.length ? (
-            <Button
-              onClick={triggerVendooBot}
-              className="touch-friendly bg-blue-600 text-white rounded flex items-center gap-2 mt-4 transition-transform hover:scale-95"
-            >
+            <Button onClick={triggerVendooBot} className="touch-friendly bg-blue-600 text-white rounded flex items-center gap-2 mt-4 transition-transform hover:scale-95">
               <CheckCircle className="w-5 h-5" /> Send to Vendoo Bot
             </Button>
           ) : null}
@@ -693,10 +652,7 @@ const App = () => {
                   <p className="text-sm">{item.platform}</p>
                   <p className="text-sm">{item.buyerAddress}</p>
                   <p className="text-sm">Deadline: {item.shippingDeadline}</p>
-                  <Button
-                    onClick={() => markShipped.mutate({ id: item.id, platform: item.platform })}
-                    className="bg-green-600 text-white rounded mt-2 transition-transform hover:scale-95"
-                  >
+                  <Button onClick={() => markShipped.mutate({ id: item.id, platform: item.platform })} className="bg-green-600 text-white rounded mt-2 transition-transform hover:scale-95">
                     Mark Shipped
                   </Button>
                 </div>
@@ -720,8 +676,9 @@ const App = () => {
               <select
                 value={theme}
                 onChange={(e) => {
-                  setTheme(e.target.value as 'dark' | 'light');
-                  localStorage.setItem('theme', e.target.value);
+                  const v = e.target.value === 'light' ? 'light' : 'dark';
+                  setTheme(v);
+                  localStorage.setItem('theme', v);
                 }}
                 className={`touch-friendly border rounded p-2 w-full ${theme === 'dark' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-900'}`}
               >
@@ -731,11 +688,7 @@ const App = () => {
             </div>
             <div>
               <label className="block">Who's Near Radius (miles)</label>
-              <input
-                type="number"
-                defaultValue={25}
-                className={`touch-friendly border rounded p-2 w-full ${theme === 'dark' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-900'}`}
-              />
+              <input type="number" defaultValue={25} className={`touch-friendly border rounded p-2 w-full ${theme === 'dark' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-900'}`} />
             </div>
             <div>
               <label className="block">eBay API Key</label>
