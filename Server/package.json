@@ -5,8 +5,8 @@
   "type": "module",
   "engines": { "node": ">=20" },
   "scripts": {
-    "build": "tsc -p ./Server/tsconfig.json",
-    "start": "node ./Server/dist/index.js",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
     "dev": "ts-node src/index.ts"
   },
   "dependencies": {
