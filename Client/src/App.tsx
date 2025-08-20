@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import axios from 'axios';
+import api from './api';
 import { BrowserMultiFormatReader } from '@zxing/library';
 import { Camera, CheckCircle, ShoppingCart, Trash2, MapPin, Package, Search, Settings, Mic } from 'lucide-react';
 import { isMobile } from 'react-device-detect';
@@ -105,7 +105,7 @@ const App: React.FC = () => {
   const { data: deweyItems, refetch: refetchDewey } = useQuery<ProductAnalysis[]>({
     queryKey: ['dewey', searchQuery],
     queryFn: async () => {
-      const { data } = await axios.get('/api/dewey');
+      const { data } = await api.get('/api/dewey');
       return data;
     },
   });
