@@ -1,42 +1,45 @@
 {
   "name": "buyfly-client",
   "version": "1.0.0",
-  "main": "index.js",
+  "private": true,
+  "engines": {
+    "node": "18.x"
+  },
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
-    "test": "react-scripts test",
+    "test": "react-scripts test --env=jsdom",
     "eject": "react-scripts eject"
   },
   "dependencies": {
-    "@tanstack/react-query": "^5.8.7",
-    "axios": "^1.6.2",
+    "@tanstack/react-query": "^4.36.1",
     "@zxing/library": "^0.20.0",
-    "lucide-react": "^0.379.0",
+    "@radix-ui/react-button": "^1.0.4",
+    "@radix-ui/react-toast": "^1.1.5",
+    "axios": "^1.7.2",
+    "dexie": "^3.2.7",
+    "lucide-react": "^0.441.0",
     "react": "^18.2.0",
     "react-device-detect": "^2.2.3",
     "react-dom": "^18.2.0",
-    "react-scripts": "^5.0.1",
-    "react-virtuoso": "^4.8.3",
-    "dexie": "^3.2.7"
+    "react-virtuoso": "^4.7.6",
+    "react-scripts": "5.0.1"
   },
-{
-  "engines": {
-    "node": "18.x"
-  }
-}
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "typescript": "^5.4.0"
+  },
   "browserslist": {
-    "production": [">0.2%", "not dead", "not op_mini all"],
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
     "development": [
       "last 1 chrome version",
       "last 1 firefox version",
       "last 1 safari version"
-    ]
-  },
-  "eslintConfig": {
-    "extends": [
-      "react-app",
-      "react-app/jest"
     ]
   }
 }
